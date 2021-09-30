@@ -15,13 +15,17 @@
 void scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
 {
     int count = scan->scan_time / scan->time_increment;
-    printf("[YDLIDAR INFO]: I heard a laser scan %s[%d]:\n", scan->header.frame_id.c_str(), count);
+    //printf("[YDLIDAR INFO]: I heard a laser scan %s[%d]:\n", scan->header.frame_id.c_str(), count);
     printf("[YDLIDAR INFO]: angle_range : [%f, %f]\n", RAD2DEG(scan->angle_min), RAD2DEG(scan->angle_max));
+	std::cout << RAD2DEG(scan->angle_increment)<< " , " << count << std::endl;
+	std::cout << scan->scan_time << " , " << scan->time_increment << count << std::endl;
   
-    for(int i = 0; i < count; i++) {
+        for(int i = 0; i < count/2; i++) {
         float degree = RAD2DEG(scan->angle_min + scan->angle_increment * i);
-	if(degree > -5 && degree< 5)
-        printf("[YDLIDAR INFO]: angle-distance : [%f, %f, %i]\n", degree, scan->ranges[i], i);
+	float z = i;
+//	if(degree >  -1 && degree <1)
+  //      	printf("[YDLIDAR INFO]: angle-distance : [%f, %f, %i]\n", degree, scan->ranges[i], i);
+	std::cout << z /count * 360 << " , " << scan->ranges[i] << std::endl;
     }
 }
 

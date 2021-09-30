@@ -17,7 +17,7 @@
 
 using namespace ydlidar;
 
-#define ROSVerision "1.4.2"
+#define ROSVerision "1.4.6"
 
 
 std::vector<float> split(const std::string &s, char delim) {
@@ -43,7 +43,6 @@ int main(int argc, char * argv[]) {
   
     std::string port;
     int baudrate=230400;
-    int samp_rate = 9;
     std::string frame_id;
     bool reversion, resolution_fixed;
     bool auto_reconnect;
@@ -53,22 +52,30 @@ int main(int argc, char * argv[]) {
     std::vector<float> ignore_array;  
     double max_range, min_range;
     double frequency;
+    int samp_rate = 5;
+    bool inverted = true;
+    bool isSingleChannel = false;
+    bool isTOFLidar = false;
 
     ros::NodeHandle nh;
     ros::Publisher scan_pub = nh.advertise<sensor_msgs::LaserScan>("scan", 1000);
     ros::NodeHandle nh_private("~");
     nh_private.param<std::string>("port", port, "/dev/ydlidar"); 
+    nh_private.param<int>("baudrate", baudrate, 230400); 
     nh_private.param<std::string>("frame_id", frame_id, "laser_frame");
     nh_private.param<bool>("resolution_fixed", resolution_fixed, "true");
     nh_private.param<bool>("auto_reconnect", auto_reconnect, "true");
     nh_private.param<bool>("reversion", reversion, "true");
     nh_private.param<double>("angle_max", angle_max , 180);
     nh_private.param<double>("angle_min", angle_min , -180);
-    nh_private.param<double>("range_max", max_range , 16.0);
-    nh_private.param<double>("range_min", min_range , 0.08);
+    nh_private.param<double>("range_max", max_range , 64.0);
+    nh_private.param<double>("range_min", min_range , 0.01);
     nh_private.param<double>("frequency", frequency , 10.0);
-    nh_private.param<int>("samp_rate", samp_rate , 9);
     nh_private.param<std::string>("ignore_array",list,"");
+    nh_private.param<int>("samp_rate", samp_rate, samp_rate);
+    nh_private.param<bool>("isSingleChannel", isSingleChannel, isSingleChannel);
+    nh_private.param<bool>("isTOFLidar", isTOFLidar, isTOFLidar);
+ 
 
     ignore_array = split(list ,',');
     if(ignore_array.size()%2){
@@ -82,11 +89,11 @@ int main(int argc, char * argv[]) {
     }
 
     CYdLidar laser;
-    if(frequency<5){
+    if(frequency<3){
        frequency = 7.0; 
     }
-    if(frequency>12){
-        frequency = 12;
+    if(frequency>15.7){
+        frequency = 15.7;
     }
     if(angle_max < angle_min){
         double temp = angle_max;
@@ -105,8 +112,11 @@ int main(int argc, char * argv[]) {
     laser.setFixedResolution(resolution_fixed);
     laser.setAutoReconnect(auto_reconnect);
     laser.setScanFrequency(frequency);
-    laser.setSampleRate(samp_rate);
     laser.setIgnoreArray(ignore_array);
+    laser.setSampleRate(samp_rate);
+    laser.setInverted(inverted);
+    laser.setSingleChannel(isSingleChannel);
+    laser.setLidarType(isTOFLidar ? TYPE_TOF : TYPE_TRIANGLE);
     bool ret = laser.initialize();
     if (ret) {
         ret = laser.turnOn();
@@ -124,8 +134,8 @@ int main(int argc, char * argv[]) {
         if(laser.doProcessSimple(scan, hardError )){
             sensor_msgs::LaserScan scan_msg;
             ros::Time start_scan_time;
-            start_scan_time.sec = scan.system_time_stamp/1000000000ul;
-            start_scan_time.nsec = scan.system_time_stamp%1000000000ul;
+            start_scan_time.sec = scan.stamp/1000000000ul;
+            start_scan_time.nsec = scan.stamp%1000000000ul;
             scan_msg.header.stamp = start_scan_time;
             scan_msg.header.frame_id = frame_id;
             scan_msg.angle_min =(scan.config.min_angle);
@@ -135,9 +145,16 @@ int main(int argc, char * argv[]) {
             scan_msg.time_increment = scan.config.time_increment;
             scan_msg.range_min = (scan.config.min_range);
             scan_msg.range_max = (scan.config.max_range);
-            
-            scan_msg.ranges = scan.ranges;
-            scan_msg.intensities =  scan.intensities;
+            int size = (scan.config.max_angle - scan.config.min_angle)/ scan.config.angle_increment + 1;
+            scan_msg.ranges.resize(size);
+            scan_msg.intensities.resize(size);
+            for(int i=0; i < scan.points.size(); i++) {
+                int index = std::ceil((scan.points[i].angle - scan.config.min_angle)/scan.config.angle_increment);
+                if(index >=0 && index < size) {
+                     scan_msg.ranges[index] = scan.points[i].range;
+                     scan_msg.intensities[index] = scan.points[i].intensity;
+                }
+            }
             scan_pub.publish(scan_msg);
         }  
         rate.sleep();
@@ -145,7 +162,7 @@ int main(int argc, char * argv[]) {
     }
 
     laser.turnOff();
-    printf("[YDLIDAR INFO] Now YDLIDAR is stopping .......\n");
+    ROS_INFO("[YDLIDAR INFO] Now YDLIDAR is stopping .......");
     laser.disconnecting();
     return 0;
 }

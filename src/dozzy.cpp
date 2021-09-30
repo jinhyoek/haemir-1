@@ -6,65 +6,49 @@
 #include "std_msgs/Float64.h"
 #define RAD2DEG(x) ((x)*180./M_PI)
 #include <sstream>
-
+#include <algorithm>
 float g_optimal;
 std::vector<float> distances;
 std::vector<float> real_distances;
 std::vector< std::vector <float> > tmp;
 int g_num;
 int g_count;
-float min;
-float find_optimal_degree(const std::vector<float> distances);
+float smallest;
 
+float find_optimal_degree(const std::vector<float> distances);
+float minimal(const std::vector<float> real_distances,int h);
 
 float scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
 {
     int count = scan->scan_time / scan->time_increment;
 	g_count = count ;
-    float min = 0;
-    
+    float dozzy = 0.8;
+    int h = 0;
 	distances.clear();
 	real_distances.clear();
 
-	int a = 0;
-	int b = 0;
 	for(int i = 0; i <= count /2 ; i++) 
     {
    
-      	if (scan->ranges[i] > 2 || scan->ranges[i]  == 0) 
+      	if (scan->ranges[i] > dozzy || scan->ranges[i]  == 0) 
 	  {
 		  distances.push_back(1);
-		a++;
 	  }                                  
-      	else if (scan->ranges[i] < 0.3)
+      	else if (scan->ranges[i] > dozzy || scan->ranges[i]  == 0)
       {
 		  distances.push_back(0);
-		b++;
       }
-
-	if (a = count )
+      
+      	if (scan -> ranges[i] > 0.12)
 	{
-	 distances[0] = 0;}
-	else if (b = count)
-	{
-	 distances[0] = 1;}
-
-      	//if (scan -> ranges[i] > 0.12)
-	//{
-		//real_distances.push_back(scan->ranges[i]);
-	//}
-     //min = *min_element(real_distances.begin(), real_distances.end());
+		real_distances.push_back(scan->ranges[i]);
+		h++;
+	}
+     smallest = minimal(real_distances,h);
     }
-	//printf("min:%f\n",min);
-	for(int i = 0; i <= count /2 ; i++)
-
-	{	float z = i; 
-	std::cout << "distance[" << z << "]" << distances[i] << std::endl;}
-	printf("clear");
+	printf("smallest:%f\n",smallest);
     return (find_optimal_degree(distances));
 }
-
-
 
 std::vector <std::vector <float> > make_second_array(const std::vector<float> distances)
 {
@@ -78,9 +62,9 @@ std::vector <std::vector <float> > make_second_array(const std::vector<float> di
 	array.clear();
 	tmp.clear();
 	int i;
-
 	for (i = 1; i <= g_count /2  ; i++) {
-        	if ((distances[i - 1] == 1) && (distances[i] == 0) && (ranges > 5) && (first_angle != 0)) {
+
+        	if ((distances[i - 1] == 1) && (distances[i] == 0) && (ranges > 10) && (first_angle != 0)) {
 				nums[0] = ranges;
 				nums[1] = first_angle;
 				array.push_back(nums);
@@ -112,7 +96,7 @@ float select_angle(std::vector< std::vector<float> > array)
    first_angle = array[0][1];
 
       // 배열 첫번째 값을 최소 최대값으로 설정
-	for(i=0; i < g_num-1 ;i++)
+	for(i=0; i < g_num ;i++)
 	{
 		if(ranges < array[i][0])
 	{
@@ -150,10 +134,13 @@ float find_optimal_degree(const std::vector<float> distances)
 }
 
 
-float min_distance(const std::vector<float> real_distances)
+float minimal(const std::vector<float> real_distances,int h)
 {
-	float min = *min_element(real_distances.begin(), real_distances.end());
-	return min;
+	smallest = 10;
+	for (int i=0; i<h - 1 ; i++)
+	{ if (real_distances[i] < smallest)
+		{smallest = real_distances[i]; }}
+	return smallest;
 }
 
 int main(int argc, char **argv)
@@ -161,8 +148,8 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "seven");
     ros::NodeHandle n;
     ros::Subscriber sub = n.subscribe<sensor_msgs::LaserScan>("/scan", 1000, scanCallback);
-	ros::Publisher angle_pub = n.advertise<std_msgs::Float64>("rotate_angle", 1000);
-	ros::Publisher min_pub = n.advertise<std_msgs::Float64>("minimum_distance", 1000);
+	ros::Publisher optimal_pub = n.advertise<std_msgs::Float64>("optimal_angle", 1000);
+	ros::Publisher miny_pub = n.advertise<std_msgs::Float64>("minimum_distance", 1000);
 	ros::Rate loop_rate(1);
 	while (ros::ok())
 	{
@@ -174,13 +161,13 @@ int main(int argc, char **argv)
 		//std::stringstream ss;
 		//ss << g_optimal  ;
 		msg.data = g_o;
-		mini.data = min;
+		mini.data = smallest;
 
 		ROS_INFO("%f", msg.data);
 		ROS_INFO("%f", mini.data);
 
-		angle_pub.publish(msg);
-		min_pub.publish(mini);
+		optimal_pub.publish(msg);
+		miny_pub.publish(mini);
 
 		ros::spinOnce();
 
