@@ -22,7 +22,7 @@ float scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
 {
     int count = scan->scan_time / scan->time_increment;
 	g_count = count ;
-    
+    float dozzy = 0.8;
     int h = 0;
 	distances.clear();
 	real_distances.clear();
@@ -30,23 +30,23 @@ float scanCallback(const sensor_msgs::LaserScan::ConstPtr& scan)
 	for(int i = 0; i <= count /2 ; i++) 
     {
    
-      	if (scan->ranges[i] > 1 || scan->ranges[i]  == 0) 
+      	if (scan->ranges[i] > dozzy || scan->ranges[i]  == 0) 
 	  {
 		  distances.push_back(1);
 	  }                                  
-      	else
+      	else if (scan->ranges[i] <= dozzy)
       {
 		  distances.push_back(0);
       }
       
-      	if (scan -> ranges[i] > 0.12)
-	{
-		real_distances.push_back(scan->ranges[i]);
-		h++;
+      	//if (scan -> ranges[i] > 0.12)
+	//{
+	//	real_distances.push_back(scan->ranges[i]);
+	//	h++;
 	}
-     smallest = minimal(real_distances,h);
-    }
-	printf("smallest:%f\n",smallest);
+    // smallest = minimal(real_distances,h);
+    //}
+	//printf("smallest:%f\n",smallest);
     return (find_optimal_degree(distances));
 }
 
@@ -64,7 +64,7 @@ std::vector <std::vector <float> > make_second_array(const std::vector<float> di
 	int i;
 	for (i = 1; i <= g_count /2  ; i++) {
 
-        	if ((distances[i - 1] == 1) && (distances[i] == 0) && (ranges > 5) && (first_angle != 0)) {
+        	if ((distances[i - 1] == 1) && (distances[i] == 0) && (ranges > 10) && (first_angle != 0)) {
 				nums[0] = ranges;
 				nums[1] = first_angle;
 				array.push_back(nums);
@@ -134,40 +134,40 @@ float find_optimal_degree(const std::vector<float> distances)
 }
 
 
-float minimal(const std::vector<float> real_distances,int h)
-{
-	smallest = 10;
-	for (int i=0; i<h - 1 ; i++)
-	{ if (real_distances[i] < smallest)
-		{smallest = real_distances[i]; }}
-	return smallest;
-}
+//float minimal(const std::vector<float> real_distances,int h)
+//{
+	//smallest = 10;
+	//for (int i=0; i<h - 1 ; i++)
+	//{ if (real_distances[i] < smallest)
+	//	{smallest = real_distances[i]; }}
+	//return smallest;
+//}
 
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "seven");
     ros::NodeHandle n;
     ros::Subscriber sub = n.subscribe<sensor_msgs::LaserScan>("/scan", 1000, scanCallback);
-	ros::Publisher angle_pub = n.advertise<std_msgs::Float64>("rotate_angle", 1000);
-	ros::Publisher min_pub = n.advertise<std_msgs::Float64>("minimum_distance", 1000);
+	ros::Publisher optimal_pub = n.advertise<std_msgs::Float64>("optimal_angle", 1000);
+	ros::Publisher miny_pub = n.advertise<std_msgs::Float64>("minimum_distance", 1000);
 	ros::Rate loop_rate(1);
 	while (ros::ok())
 	{
 		std_msgs::Float64 msg;
-		std_msgs::Float64 mini;
+		//std_msgs::Float64 mini;
 
         float g_o;
         g_o = g_optimal;
 		//std::stringstream ss;
 		//ss << g_optimal  ;
 		msg.data = g_o;
-		mini.data = smallest;
+		//mini.data = smallest;
 
 		ROS_INFO("%f", msg.data);
-		ROS_INFO("%f", mini.data);
+		//ROS_INFO("%f", mini.data);
 
-		angle_pub.publish(msg);
-		min_pub.publish(mini);
+		optimal_pub.publish(msg);
+		//miny_pub.publish(mini);
 
 		ros::spinOnce();
 
